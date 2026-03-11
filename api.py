@@ -280,11 +280,10 @@ async def get_status():
 @app.post("/api/simulate")
 async def run_simulation(req: SimulationRequest):
     """
-    Launch a federated learning simulation.
+    Launch a federated learning simulation in the background.
 
-    This runs **synchronously** in a background thread so the event-loop
-    stays responsive. Poll ``GET /api/status`` to watch progress, then
-    ``GET /api/results`` when status is ``done``.
+    Returns immediately with a ``run_id``. Poll ``GET /api/status`` until
+    status is ``done``, then fetch results via ``GET /api/results``.
     """
     global current_run_id
 
@@ -297,15 +296,17 @@ async def run_simulation(req: SimulationRequest):
     current_run_id = run_id
     simulation_status[run_id] = "running"
 
-    try:
-        # Run the heavy computation in a thread to avoid blocking the event loop
-        result = await asyncio.to_thread(_run_simulation, req)
-        simulation_store[run_id] = result
-        simulation_status[run_id] = "done"
-        return {"run_id": run_id, "status": "done", "result": result}
-    except Exception as exc:
-        simulation_status[run_id] = "error"
-        raise HTTPException(500, detail=str(exc))
+    async def _background():
+        try:
+            result = await asyncio.to_thread(_run_simulation, req)
+            simulation_store[run_id] = result
+            simulation_status[run_id] = "done"
+        except Exception as exc:
+            simulation_status[run_id] = f"error: {exc}"
+
+    asyncio.create_task(_background())
+
+    return {"run_id": run_id, "status": "running"}
 
 
 @app.get("/api/results")

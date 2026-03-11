@@ -578,26 +578,63 @@
 
         document.getElementById("btnRun").disabled = true;
         document.getElementById("progressSection").classList.remove("hidden");
-        document.getElementById("progressBar").style.width = "30%";
+        document.getElementById("progressBar").style.width = "10%";
         document.getElementById("statusText").innerHTML =
-          '<span class="spinner"></span> Simulating&hellip; This may take a few minutes.';
+          '<span class="spinner"></span> Starting simulation&hellip;';
 
         try {
+          // Fire simulation — returns immediately with a run_id
           const resp = await fetch("/api/simulate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           });
 
-          document.getElementById("progressBar").style.width = "100%";
-
           if (!resp.ok) {
             const err = await resp.json();
-            throw new Error(err.detail || "Simulation failed");
+            throw new Error(err.detail || "Simulation failed to start");
           }
 
-          const data = await resp.json();
-          renderResults(data.result);
+          const { run_id } = await resp.json();
+
+          // Poll /api/status until done
+          let elapsed = 0;
+          const pollInterval = 3000; // ms
+          await new Promise((resolve, reject) => {
+            const timer = setInterval(async () => {
+              elapsed += pollInterval;
+              const progress = Math.min(
+                10 + Math.floor((elapsed / 180000) * 85),
+                90,
+              );
+              document.getElementById("progressBar").style.width =
+                progress + "%";
+              document.getElementById("statusText").innerHTML =
+                `<span class="spinner"></span> Simulating&hellip; (${Math.floor(elapsed / 1000)}s elapsed)`;
+
+              try {
+                const statusResp = await fetch("/api/status");
+                const { status } = await statusResp.json();
+                if (status === "done") {
+                  clearInterval(timer);
+                  resolve();
+                } else if (status && status.startsWith("error")) {
+                  clearInterval(timer);
+                  reject(new Error(status));
+                }
+              } catch (e) {
+                clearInterval(timer);
+                reject(e);
+              }
+            }, pollInterval);
+          });
+
+          // Fetch results
+          document.getElementById("progressBar").style.width = "100%";
+          const resultsResp = await fetch(`/api/results/${run_id}`);
+          if (!resultsResp.ok) throw new Error("Failed to fetch results");
+          const data = await resultsResp.json();
+          renderResults(data);
         } catch (e) {
           document.getElementById("statusText").textContent =
             "Error: " + e.message;
