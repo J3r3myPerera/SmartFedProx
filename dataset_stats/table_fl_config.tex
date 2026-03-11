@@ -1,0 +1,21 @@
+\begin{table}
+\caption{Federated learning dataset configuration.}
+\label{tab:fl-config}
+\begin{tabular}{lp{8cm}}
+\toprule
+ & Property & Value \\
+\midrule
+0 & Dataset & Indian Personal Finance \\
+1 & Task & Regression (Disposable Income) \\
+2 & Devices (clients) & 10 \\
+3 & Total partitioned samples & 6,433 \\
+4 & Samples / device (mean) & 643.3 \\
+5 & Samples / device (std) & 206.4 \\
+6 & Samples / device (min) & 400 \\
+7 & Samples / device (max) & 1,040 \\
+8 & Train / Test split & 80 / 20 \\
+9 & Non-IID method & Feature-based (Occupation × City Tier × Income bracket) \\
+10 & Partitioning keys & 36 unique groups \\
+\bottomrule
+\end{tabular}
+\end{table}
